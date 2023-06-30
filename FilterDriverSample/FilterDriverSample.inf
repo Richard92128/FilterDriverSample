@@ -1,0 +1,77 @@
+;
+; FilterDriverSample.inf
+;
+
+[Version]
+Signature="$WINDOWS NT$"
+Class=System ; TODO: specify appropriate Class
+ClassGuid={4d36e97d-e325-11ce-bfc1-08002be10318} ; TODO: specify appropriate ClassGuid
+Provider=%ManufacturerName%
+CatalogFile=FilterDriverSample.cat
+DriverVer= ; TODO: set DriverVer in stampinf property pages
+PnpLockdown=1
+
+[DestinationDirs]
+DefaultDestDir = 12
+FilterDriverSample_Device_CoInstaller_CopyFiles = 11
+
+[SourceDisksNames]
+1 = %DiskName%,,,""
+
+[SourceDisksFiles]
+FilterDriverSample.sys  = 1,,
+WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll=1 ; make sure the number matches with SourceDisksNames
+
+;*****************************************
+; Install Section
+;*****************************************
+
+[Manufacturer]
+%ManufacturerName%=Standard,NT$ARCH$
+
+[Standard.NT$ARCH$]
+%FilterDriverSample.DeviceDesc%=FilterDriverSample_Device, Root\FilterDriverSample ; TODO: edit hw-id
+
+[FilterDriverSample_Device.NT]
+CopyFiles=Drivers_Dir
+
+[Drivers_Dir]
+FilterDriverSample.sys
+
+;-------------- Service installation
+[FilterDriverSample_Device.NT.Services]
+AddService = FilterDriverSample,%SPSVCINST_ASSOCSERVICE%, FilterDriverSample_Service_Inst
+
+; -------------- FilterDriverSample driver install sections
+[FilterDriverSample_Service_Inst]
+DisplayName    = %FilterDriverSample.SVCDESC%
+ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
+StartType      = 3               ; SERVICE_DEMAND_START
+ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %12%\FilterDriverSample.sys
+
+;
+;--- FilterDriverSample_Device Coinstaller installation ------
+;
+
+[FilterDriverSample_Device.NT.CoInstallers]
+AddReg=FilterDriverSample_Device_CoInstaller_AddReg
+CopyFiles=FilterDriverSample_Device_CoInstaller_CopyFiles
+
+[FilterDriverSample_Device_CoInstaller_AddReg]
+HKR,,CoInstallers32,0x00010000, "WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll,WdfCoInstaller"
+
+[FilterDriverSample_Device_CoInstaller_CopyFiles]
+WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll
+
+[FilterDriverSample_Device.NT.Wdf]
+KmdfService =  FilterDriverSample, FilterDriverSample_wdfsect
+[FilterDriverSample_wdfsect]
+KmdfLibraryVersion = $KMDFVERSION$
+
+[Strings]
+SPSVCINST_ASSOCSERVICE= 0x00000002
+ManufacturerName="<Your manufacturer name>" ;TODO: Replace with your manufacturer name
+DiskName = "FilterDriverSample Installation Disk"
+FilterDriverSample.DeviceDesc = "FilterDriverSample Device"
+FilterDriverSample.SVCDESC = "FilterDriverSample Service"
