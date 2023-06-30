@@ -1,0 +1,77 @@
+;
+; FilterDriverAndApp.inf
+;
+
+[Version]
+Signature="$WINDOWS NT$"
+Class=System ; TODO: specify appropriate Class
+ClassGuid={4d36e97d-e325-11ce-bfc1-08002be10318} ; TODO: specify appropriate ClassGuid
+Provider=%ManufacturerName%
+CatalogFile=FilterDriverAndApp.cat
+DriverVer= ; TODO: set DriverVer in stampinf property pages
+PnpLockdown=1
+
+[DestinationDirs]
+DefaultDestDir = 12
+FilterDriverAndApp_Device_CoInstaller_CopyFiles = 11
+
+[SourceDisksNames]
+1 = %DiskName%,,,""
+
+[SourceDisksFiles]
+FilterDriverAndApp.sys  = 1,,
+WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll=1 ; make sure the number matches with SourceDisksNames
+
+;*****************************************
+; Install Section
+;*****************************************
+
+[Manufacturer]
+%ManufacturerName%=Standard,NT$ARCH$
+
+[Standard.NT$ARCH$]
+%FilterDriverAndApp.DeviceDesc%=FilterDriverAndApp_Device, Root\FilterDriverAndApp ; TODO: edit hw-id
+
+[FilterDriverAndApp_Device.NT]
+CopyFiles=Drivers_Dir
+
+[Drivers_Dir]
+FilterDriverAndApp.sys
+
+;-------------- Service installation
+[FilterDriverAndApp_Device.NT.Services]
+AddService = FilterDriverAndApp,%SPSVCINST_ASSOCSERVICE%, FilterDriverAndApp_Service_Inst
+
+; -------------- FilterDriverAndApp driver install sections
+[FilterDriverAndApp_Service_Inst]
+DisplayName    = %FilterDriverAndApp.SVCDESC%
+ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
+StartType      = 3               ; SERVICE_DEMAND_START
+ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %12%\FilterDriverAndApp.sys
+
+;
+;--- FilterDriverAndApp_Device Coinstaller installation ------
+;
+
+[FilterDriverAndApp_Device.NT.CoInstallers]
+AddReg=FilterDriverAndApp_Device_CoInstaller_AddReg
+CopyFiles=FilterDriverAndApp_Device_CoInstaller_CopyFiles
+
+[FilterDriverAndApp_Device_CoInstaller_AddReg]
+HKR,,CoInstallers32,0x00010000, "WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll,WdfCoInstaller"
+
+[FilterDriverAndApp_Device_CoInstaller_CopyFiles]
+WdfCoInstaller$KMDFCOINSTALLERVERSION$.dll
+
+[FilterDriverAndApp_Device.NT.Wdf]
+KmdfService =  FilterDriverAndApp, FilterDriverAndApp_wdfsect
+[FilterDriverAndApp_wdfsect]
+KmdfLibraryVersion = $KMDFVERSION$
+
+[Strings]
+SPSVCINST_ASSOCSERVICE= 0x00000002
+ManufacturerName="<Your manufacturer name>" ;TODO: Replace with your manufacturer name
+DiskName = "FilterDriverAndApp Installation Disk"
+FilterDriverAndApp.DeviceDesc = "FilterDriverAndApp Device"
+FilterDriverAndApp.SVCDESC = "FilterDriverAndApp Service"
