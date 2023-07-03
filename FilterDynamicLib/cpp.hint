@@ -1,0 +1,2 @@
+#define FILTERDYNAMICLIB_API __declspec(dllexport)
+#define FILTERDYNAMICLIB_API __declspec(dllimport)
