@@ -39,6 +39,7 @@ Environment:
 #define DRIVER_PORT_NAME    L"\\MicrosoftMiniFilterPort"
 #define FLTTIMEOUT    (-10000)
 #define MAX_FILE_PATH (261)
+#define MAX_VOLUME_NAME_LEN (100)
 
 ////////////////////////////////////////////////////////////////////////////////
 ////  Macros                                                                  //
@@ -88,10 +89,17 @@ extern "C" {
         //
 
         PFLT_PORT ClientPort;
+
+        //
+        //  Volume Name
+        //
+
+        WCHAR VolumeName[MAX_VOLUME_NAME_LEN];
     } MNFLT_DATA;
 
     typedef struct _TFRSTRING
     {
+        WCHAR VolumeName[MAX_VOLUME_NAME_LEN];
         WCHAR  Content[MAX_FILE_PATH];
     } TFRSTR;
 

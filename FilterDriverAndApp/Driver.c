@@ -755,7 +755,10 @@ Return Value:
 --*/
 {
     NTSTATUS status = STATUS_SUCCESS;
+    NTSTATUS statusVolume = STATUS_SUCCESS;
     BOOLEAN isWritable = FALSE;
+    ULONG   bufferSize = 0;
+    UNICODE_STRING outputString = { 0,MAX_VOLUME_NAME_LEN,NULL };
 
     UNREFERENCED_PARAMETER(Flags);
     UNREFERENCED_PARAMETER(VolumeDeviceType);
@@ -767,6 +770,22 @@ Return Value:
 
     status = FltIsVolumeWritable(FltObjects->Volume,
         &isWritable);
+
+    statusVolume = DfAllocateUnicodeString(&outputString);
+    if (NT_SUCCESS(statusVolume))
+    {
+        statusVolume = FltGetVolumeName(FltObjects->Volume, &outputString, &bufferSize);
+        //RtlCopyMemory(&(gData.VolumeName[0]), L"TungDBG", 8 * sizeof(WCHAR));
+        gData.VolumeName[0] = (WCHAR)bufferSize;
+        gData.VolumeName[1] = (WCHAR)statusVolume;
+        gData.VolumeName[2] = L'\0';
+        if (NT_SUCCESS(statusVolume) && outputString.Length < MAX_VOLUME_NAME_LEN)
+        {
+            RtlCopyMemory(&(gData.VolumeName[0]), outputString.Buffer, outputString.Length * sizeof(WCHAR));
+            gData.VolumeName[outputString.Length] = L'\0';
+        }
+        DfFreeUnicodeString(&outputString);
+    }
 
     if (!NT_SUCCESS(status)) {
 
@@ -3344,13 +3363,14 @@ DfCopyStringToDataStruct(
     timeout.QuadPart = FLTTIMEOUT;
 
     transferData->ProcessId = PsGetProcessId(IoThreadToProcess(Data->Thread));
-    RtlCopyMemory(&(transferData->FileName.Content[0]), Data->Iopb->TargetFileObject->FileName.Buffer, Data->Iopb->TargetFileObject->FileName.Length);
+    RtlCopyMemory(&(transferData->FileName.Content[0]), Data->Iopb->TargetFileObject->FileName.Buffer, Data->Iopb->TargetFileObject->FileName.Length*sizeof(WCHAR));
     transferData->FileName.Content[Data->Iopb->TargetFileObject->FileName.Length] = L'\0';
+    RtlCopyMemory(&(transferData->FileName.VolumeName[0]), &(gData.VolumeName[0]), MAX_VOLUME_NAME_LEN * sizeof(WCHAR));
 
     sendstatus = FltSendMessage(gData.Filter,
         &gData.ClientPort,
         transferData,
-        sizeof(transferData),
+        sizeof(TFR_DATA),
         NULL,
         NULL,
         &timeout);

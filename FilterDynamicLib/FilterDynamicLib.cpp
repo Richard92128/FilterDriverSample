@@ -119,7 +119,7 @@ Return Value:
             continue;
         }
 
-        std::wcout << "File:" << data.FileName.Content << L" Deleted by " << data.ProcessId << std::endl;
+        std::wcout << "File:" << data.FileName.VolumeName << data.FileName.Content << L" Deleted by " << data.ProcessId << std::endl;
 
     }
 
