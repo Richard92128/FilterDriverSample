@@ -1,0 +1,11 @@
+C:\Users\navervietnam\Documents\ComRegister\OutputFolder\ComRegister.exe.config
+C:\Users\navervietnam\Documents\ComRegister\OutputFolder\ComRegister.exe
+C:\Users\navervietnam\Documents\ComRegister\OutputFolder\ComRegister.pdb
+C:\Users\navervietnam\Documents\ComRegister\obj\Debug\ComRegister.csproj.AssemblyReference.cache
+C:\Users\navervietnam\Documents\ComRegister\obj\Debug\ComRegister.csproj.SuggestedBindingRedirects.cache
+C:\Users\navervietnam\Documents\ComRegister\obj\Debug\ComRegister.csproj.CoreCompileInputs.cache
+C:\Users\navervietnam\Documents\ComRegister\obj\Debug\ComRegister.exe
+C:\Users\navervietnam\Documents\ComRegister\obj\Debug\ComRegister.pdb
+C:\Users\navervietnam\Documents\EventLogDemo\ComRegister\OutputFolder\ComRegister.exe.config
+C:\Users\navervietnam\Documents\EventLogDemo\ComRegister\OutputFolder\ComRegister.exe
+C:\Users\navervietnam\Documents\EventLogDemo\ComRegister\OutputFolder\ComRegister.pdb

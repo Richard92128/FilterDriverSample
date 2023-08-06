@@ -17,6 +17,9 @@ Environment:
 #include <fltKernel.h>
 #include <dontuse.h>
 #include <suppress.h>
+#include <wdm.h>
+#include <ntddk.h>
+#include <Ntifs.h>
 
 #define DFDBG_TRACE_ERRORS              0x00000001
 #define DFDBG_TRACE_ROUTINES            0x00000002

@@ -1,1 +1,26 @@
-﻿
+﻿  Building 'FilterDriverAndApp' with toolset 'WindowsKernelModeDriver10.0' and the 'Universal' target platform.
+  Stamping x64\Debug\FilterDriverAndApp.inf
+  Stamping [Version] section with DriverVer=07/26/2023,15.44.12.310
+C:\Users\navervietnam\Documents\GitHub\FilterDriverSample\FilterDriverAndApp\FilterDriverAndApp.inf(47-47): warning 1205: Section [MiniFilter.DriverFiles] referenced from DelFiles and CopyFiles directive.
+  comm.c
+  Driver.c
+  Generating Code...
+  FilterDriverAndApp.vcxproj -> C:\Users\navervietnam\Documents\GitHub\FilterDriverSample\FilterDriverAndApp\x64\Debug\FilterDriverAndApp.sys
+  Done Adding Additional Store
+  Successfully signed: C:\Users\navervietnam\Documents\GitHub\FilterDriverSample\FilterDriverAndApp\x64\Debug\FilterDriverAndApp.sys
+  
+  Driver is 'Universal'.
+  ........................
+  Signability test complete.
+  
+  Errors:
+  None
+  
+  Warnings:
+  None
+  
+  Catalog generation complete.
+  C:\Users\navervietnam\Documents\GitHub\FilterDriverSample\FilterDriverAndApp\x64\Debug\FilterDriverAndApp\filterdriverandapp.cat
+  Done Adding Additional Store
+  Successfully signed: C:\Users\navervietnam\Documents\GitHub\FilterDriverSample\FilterDriverAndApp\x64\Debug\FilterDriverAndApp\filterdriverandapp.cat
+  

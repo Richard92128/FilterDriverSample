@@ -1,0 +1,86 @@
+;
+; FilterDriverAndApp.inf
+;
+
+[Version]
+Signature   = "$WINDOWS NT$"
+Class       = "ActivityMonitor"
+ClassGuid   = {b86dff51-a31e-4bac-b3cf-e8cfe75c9fc2}
+Provider    = %ManufacturerName%
+DriverVer = 07/26/2023,15.44.12.310
+CatalogFile = FilterDriverAndApp.cat
+PnpLockdown = 1
+
+[DestinationDirs]
+DefaultDestDir = 12
+MiniFilter.DriverFiles = 12
+;MiniFilter.UserFiles   = 10,FltMgr
+
+[DefaultInstall.NTamd64]
+OptionDesc = %MiniFilterServiceDesc%
+CopyFiles = MiniFilter.DriverFiles;, MiniFilter.UserFiles
+
+[DefaultInstall.NTamd64.Services]
+AddService = %MiniFilterServiceName%,,MiniFilter.Service
+
+[DefaultUninstall.NTamd64]
+LegacyUninstall	=	1
+DelFiles   = MiniFilter.DriverFiles;, MiniFilter.UserFiles
+
+[DefaultUninstall.NTamd64.Services]
+DelService = MiniFilter,0x200
+
+[MiniFilter.Service]
+DisplayName    = %MiniFilterServiceName%
+Description    = %MiniFilterServiceDesc%
+ServiceBinary  = %12%\FilterDriverAndApp.sys
+ServiceType    = 2 ;    SERVICE_FILE_SYSTEM_DRIVER
+StartType      = 3 ;    SERVICE_DEMAND_START
+ErrorControl   = 1 ;    SERVICE_ERROR_NORMAL%
+LoadOrderGroup = "FSFilter Activity Monitor"
+AddReg         = MiniFilter.AddRegistry
+Dependencies   = FltMgr
+
+;
+; Copy Files
+;
+[MiniFilter.DriverFiles]
+FilterDriverAndApp.sys
+
+[SourceDisksFiles]
+FilterDriverAndApp.sys = 1,,
+
+[SourceDisksNames]
+1 = %DiskId1%,,,
+
+[MiniFilter.AddRegistry]
+HKR,,"DebugFlags",0x00010001 ,0x0
+HKR,,"SupportedFeatures",0x00010001,0x3
+HKR,%RegInstancesSubkeyName%,%RegDefaultInstanceValueName%,0x00000000,%DefaultInstance%
+HKR,%RegInstancesSubkeyName%"\"%Instance1.Name%,%RegAltitudeValueName%,0x00000000,%Instance1.Altitude%
+HKR,%RegInstancesSubkeyName%"\"%Instance1.Name%,%RegFlagsValueName%,0x00010001,%Instance1.Flags%
+HKR,%RegInstancesSubkeyName%"\"%Instance2.Name%,%RegAltitudeValueName%,0x00000000,%Instance2.Altitude%
+HKR,%RegInstancesSubkeyName%"\"%Instance2.Name%,%RegFlagsValueName%,0x00010001,%Instance2.Flags%
+HKR,%RegInstancesSubkeyName%"\"%Instance3.Name%,%RegAltitudeValueName%,0x00000000,%Instance3.Altitude%
+HKR,%RegInstancesSubkeyName%"\"%Instance3.Name%,%RegFlagsValueName%,0x00010001,%Instance3.Flags%
+
+[Strings]
+ManufacturerName               = "Richard ABCD"
+MiniFilterServiceDesc = "MiniFilter mini-filter driver"
+MiniFilterServiceName = "MiniFilter"
+RegInstancesSubkeyName = "Instances"
+RegDefaultInstanceValueName  = "DefaultInstance"
+RegAltitudeValueName    = "Altitude"
+RegFlagsValueName  = "Flags"
+DiskId1                 = "FilterDriverSample Device Installation Disk"
+
+DefaultInstance    = "MiniFilter - Top Instance"
+Instance1.Name     = "MiniFilter - Middle Instance"
+Instance1.Altitude = "370000"
+Instance1.Flags    = 0x1 ; Suppress automatic attachments
+Instance2.Name     = "MiniFilter - Bottom Instance"
+Instance2.Altitude = "365000"
+Instance2.Flags    = 0x1 ; Suppress automatic attachments
+Instance3.Name     = "MiniFilter - Top Instance"
+Instance3.Altitude = "385000"
+Instance3.Flags    = 0x1 ; Suppress automatic attachments
