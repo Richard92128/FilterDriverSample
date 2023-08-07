@@ -2,11 +2,16 @@
 using System;
 using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
+using System.IO;
+using System.IO.Pipes;
+using System.Linq;
 using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.ComTypes;
+using System.Security.AccessControl;
 using System.Security.Principal;
 using System.ServiceProcess;
+using System.Text;
 using System.Threading;
-using static Vanara.PInvoke.AdvApi32;
 
 namespace ServiceSample
 {
@@ -17,21 +22,75 @@ namespace ServiceSample
             InitializeComponent();
         }
 
-        private static Semaphore _lock = new Semaphore(0, 1);
-        private static EventLogQuery query = new EventLogQuery("Security", PathType.LogName, "*[EventData[Data[@Name='AccessMask']='0x10000']]");
+        private CancellationTokenSource _lock = new CancellationTokenSource();
+        private Thread _thread = null;
 
-        private Thread _thread = new Thread(_InitializeComSvr);
-        private EventLogWatcher eventLog = new EventLogWatcher(query);
-        public static void _InitializeComSvr(object _obj)
+        private static EventLogQuery _query = new EventLogQuery("Security", PathType.LogName, "*[EventData[Data[@Name='AccessMask']='0x10000']]");
+        private EventLogWatcher _eventLog = new EventLogWatcher(_query);
+
+        private void _InitializeSvr()
         {
-            Service1 svr = (Service1)_obj;
+            var logger = LogManager.GetCurrentClassLogger();
 
-            RegistrationServices rs = new RegistrationServices();
-            int cookie = rs.RegisterTypeForComClients(typeof(ComServer), RegistrationClassContext.LocalServer, RegistrationConnectionType.MultipleUse);
+            var IdentSystem = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
+            var IdentEveryOne = new SecurityIdentifier(WellKnownSidType.WorldSid, null);
+            var pipeSecurity = new PipeSecurity();
+            pipeSecurity.AddAccessRule(new PipeAccessRule(IdentSystem,
+                PipeAccessRights.ReadWrite | PipeAccessRights.CreateNewInstance,
+                AccessControlType.Allow));
+            pipeSecurity.AddAccessRule(new PipeAccessRule(IdentEveryOne,
+                PipeAccessRights.ReadWrite,
+                AccessControlType.Allow));
 
-            _lock.WaitOne();
+            var _inoutGate = new NamedPipeServerStream("WorkMornitorDeletedFileGate", PipeDirection.InOut, 1,
+                            PipeTransmissionMode.Message, PipeOptions.Asynchronous, Setting._inoutMaxBufferLen, Setting._inoutMaxBufferLen, pipeSecurity);
+            _thread = new Thread(() =>
+            {
+                while (!_lock.Token.IsCancellationRequested)
+                {
+                    //if (_inoutGate.IsMessageComplete) continue;
+                    string path;
+                    try
+                    {
+                        var _await = _inoutGate.WaitForConnectionAsync(_lock.Token);
+                        _await.Wait();
 
-            rs.UnregisterTypeForComClients(cookie);
+                        var stream = new MemoryStream();
+                        int totalLen = 0;
+                        do
+                        {
+                            byte[] buffer = new byte[Setting._inoutMaxBufferLen];
+                            int readed = _inoutGate.Read(buffer, 0, buffer.Length);
+                            totalLen += readed;
+                            stream.Write(buffer, 0, readed);
+                        }
+                        while (!_inoutGate.IsMessageComplete);
+
+                        path = Encoding.Unicode.GetString(stream.GetBuffer(), 0, totalLen);
+                        logger.Debug("Get path = {0}", path);
+
+                        bool _isValidPath = false;
+                        _inoutGate.RunAsClient(() =>
+                        {
+                            _isValidPath = true;
+                        });
+
+                        var input = Encoding.Unicode.GetBytes("OK");
+                        _inoutGate.Write(input, 0, input.Length);
+                        _inoutGate.WaitForPipeDrain();
+                        _inoutGate.Disconnect();
+                    }
+                    // Catch the IOException that is raised if the pipe is broken
+                    // or disconnected.
+                    catch (Exception e)
+                    {
+                        logger.Debug("ERROR: {0}", e.Message);
+                    }
+                }
+            });
+            _thread.IsBackground = true;
+            _thread.Start();
+            
         }
         public void _Initialize()
         {
@@ -48,7 +107,7 @@ namespace ServiceSample
             using (var app = new Process())
             {
                 app.StartInfo.FileName = "auditpol.exe";
-                app.StartInfo.Arguments = "/set /subcategory:\"File System\" /failure:disable /success:disable";
+                app.StartInfo.Arguments = "/set /subcategory:\"File System\" /failure:enable /success:enable";
                 app.StartInfo.WindowStyle = ProcessWindowStyle.Hidden;
                 app.StartInfo.Verb = "runas";
                 app.EnableRaisingEvents = true;
@@ -66,11 +125,11 @@ namespace ServiceSample
             }
 
             
-            eventLog.EventRecordWritten += EventLog_EventRecordWritten;
-            //eventLog.Enabled = true;
+            _eventLog.EventRecordWritten += EventLog_EventRecordWritten;
+            _eventLog.Enabled = true;
 
-            _thread.Start(this);
-            //_InitializeComSvr(this);
+
+            _InitializeSvr();
         }
 
         protected override void OnStart(string[] args)
@@ -84,14 +143,19 @@ namespace ServiceSample
             int tung = 1;
         }
 
+        private void _DeInitialize()
+        {
+            var logger = LogManager.GetCurrentClassLogger();
+
+            _lock.Cancel();
+            
+            _eventLog.Enabled = false;
+        }
+
         protected override void OnStop()
         {
             base.OnStop();
-
-            _lock.Release();
-            _thread.Join();
-
-            eventLog.Enabled = false;
+            _DeInitialize();
         }
     }
 }
