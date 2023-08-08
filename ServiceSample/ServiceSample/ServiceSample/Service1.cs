@@ -1,5 +1,7 @@
 ﻿using NLog;
 using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
 using System.IO;
@@ -12,6 +14,10 @@ using System.Security.Principal;
 using System.ServiceProcess;
 using System.Text;
 using System.Threading;
+using System.Xml;
+using System.Xml.Linq;
+using Vanara.Extensions;
+using static Vanara.PInvoke.Ole32;
 
 namespace ServiceSample
 {
@@ -22,22 +28,172 @@ namespace ServiceSample
             InitializeComponent();
         }
 
+        private static readonly string _rootApp = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData) + "\\WorkDeletedFileMornitor";
+        private static readonly string _logDestination = _rootApp + "\\Logs";
+        private static readonly string _logFileName = _logDestination + "\\LogDemo.txt"; // dummy file name
+        private static readonly string _configFilePath = _rootApp + "\\AppConfig.json";
+
         private CancellationTokenSource _lock = new CancellationTokenSource();
         private Thread _thread = null;
 
         private static EventLogQuery _query = new EventLogQuery("Security", PathType.LogName, "*[EventData[Data[@Name='AccessMask']='0x10000']]");
         private EventLogWatcher _eventLog = new EventLogWatcher(_query);
 
-        //private NamedPipeServerStream _inoutGate = null;
+        private object _observingTargetLock = new object();
+        private ObservingTarget _observingTarget = null; // dummy, I will implement concurence config manager for it later
 
+        private bool _SetAuditPermission(string path, bool isAdd)
+        {
+            try
+            {
+                var att = File.GetAttributes(path);
+                bool isFolder = (att & FileAttributes.Directory) == FileAttributes.Directory;
+                var iden = new SecurityIdentifier(WellKnownSidType.WorldSid, null);
+                var auditRule = new FileSystemAuditRule(iden, FileSystemRights.Delete, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit, PropagationFlags.None, AuditFlags.Success | AuditFlags.Failure);
+
+                if (isFolder)
+                {
+                    var fileSecurity = Directory.GetAccessControl(path);
+
+                    if (isAdd)
+                    {
+                        fileSecurity.SetAuditRule(auditRule);
+                    }
+                    else
+                    {
+                        if (!fileSecurity.RemoveAuditRule(auditRule))
+                        {
+                            return false;
+                        }
+                    }
+                    Directory.SetAccessControl(path, fileSecurity);
+                }
+                else
+                {
+                    var fileSecurity = File.GetAccessControl(path);
+
+                    if (isAdd)
+                    {
+                        fileSecurity.SetAuditRule(auditRule);
+                    }
+                    else
+                    {
+                        if (!fileSecurity.RemoveAuditRule(auditRule))
+                        {
+                            return false;
+                        }
+                    }
+                    File.SetAccessControl(path, fileSecurity);
+                }
+            }
+            catch 
+            {
+                return false;
+            }
+            return true;
+        }
+
+        private bool _executeCommand(string command, string path, SecurityIdentifier callerIden)
+        {
+            if (command == "RegisterFolderPath")
+            {
+                if (!_SetAuditPermission(path, true))
+                {
+                    return false;
+                }
+                else
+                {
+                    lock (_observingTargetLock)
+                    {
+                        _observingTarget = new ObservingTarget(path, callerIden);
+                    }
+                    
+                }
+            }
+            else if (command == "UnregisterFolderPath")
+            {
+                if (!_SetAuditPermission(path, false))
+                {
+                    return false;
+                }
+                else
+                {
+                    lock (_observingTargetLock)
+                    {
+                        _observingTarget = null;
+                    }
+                }
+            }
+            else if(command == "ExportFolderPath")
+            {
+                // this operation can be conducted in another thread
+                try
+                {
+                    // get log file name that matchs with the file path from configuration
+                    // implement
+                    // end session
+
+                    //var att = File.GetAttributes(path);
+                    //if((att & FileAttributes.Directory) != FileAttributes.Directory)
+                    //{
+                    //    return false;
+                    //}
+
+                    object loc = null;
+                    lock (_observingTargetLock)
+                    {
+                        if(_observingTarget != null)
+                        {
+                            loc = _observingTarget._lock;
+                        }
+                    }
+
+                    if(loc == null)
+                    {
+                        return false;
+                    }
+
+                    lock (loc)
+                    {
+
+                        string sourcepath = _logFileName; // dummy file name
+
+                        using (var fileStrm = new FileStream(sourcepath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite))
+                        using (var dest = new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.ReadWrite))
+                        {
+                            int bufferSize = 1024;
+                            dest.SetLength(fileStrm.Length);
+                            int bytesRead = -1;
+                            byte[] bytes = new byte[bufferSize];
+
+                            while ((bytesRead = fileStrm.Read(bytes, 0, bufferSize)) > 0)
+                            {
+                                dest.Write(bytes, 0, bytesRead);
+                            }
+                            dest.Flush();
+                        }
+
+                        var fileSecurity = File.GetAccessControl(path);
+                        fileSecurity.AddAccessRule(new FileSystemAccessRule(callerIden, FileSystemRights.FullControl, AccessControlType.Allow));
+                        File.SetAccessControl(path, fileSecurity);
+                    }
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
         private void _InitializeSvr()
         {
             var logger = LogManager.GetCurrentClassLogger();
 
             _thread = new Thread(() =>
             {
+                // install connecting permission, loading the users that were permited to connect pipe from the config file.
                 var IdentSystem = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
-                var IdentEveryOne = new SecurityIdentifier(WellKnownSidType.WorldSid, null);
+                var IdentEveryOne = new SecurityIdentifier(WellKnownSidType.WorldSid, null); // dummy
                 var pipeSecurity = new PipeSecurity();
                 pipeSecurity.AddAccessRule(new PipeAccessRule(IdentSystem,
                     PipeAccessRights.ReadWrite | PipeAccessRights.CreateNewInstance,
@@ -51,7 +207,11 @@ namespace ServiceSample
 
                 while (!_lock.Token.IsCancellationRequested)
                 {
+                    string retVal = "OK";
+                    string[] funcCall;
                     string path;
+                    string command;
+                    SecurityIdentifier callerIden = null;
                     try
                     {
                         var _await = _inoutGate.WaitForConnectionAsync(_lock.Token);
@@ -67,18 +227,61 @@ namespace ServiceSample
                             stream.Write(buffer, 0, readed);
                         }
                         while (!_inoutGate.IsMessageComplete);
+                        funcCall = Encoding.Unicode.GetString(stream.GetBuffer(), 0, totalLen).Split('>');
 
-                        path = Encoding.Unicode.GetString(stream.GetBuffer(), 0, totalLen);
-                        logger.Debug("Get path = {0}", path);
-
-                        bool _isValidPath = false;
-                        _inoutGate.RunAsClient(() =>
+                        if (funcCall != null && funcCall.Length == 2)
                         {
-                            // check permisson here
-                            _isValidPath = true;
-                        });
+                            command = funcCall[0];
+                            path = funcCall[1];
+                            stream.Dispose();
+                            logger.Debug("Get path = {0}", path);
 
-                        var input = Encoding.Unicode.GetBytes("OK");
+                            bool _isValidPath = false;
+                            _inoutGate.RunAsClient(() =>
+                            {
+                                logger.Debug("Impersonate: {0}", WindowsIdentity.GetCurrent().User.Value);
+
+                                //We have a System Object (maybe a file), and then we check permission on it.
+                                //If it does not have permission to read the System Object, then do return here.
+                                //Thus, we can register all users that are able to change audit rules by giving them permission to read the System Object.
+
+                                // implement here
+
+                                //end session
+
+                                FileAttributes att;
+                                try
+                                {
+                                    att = File.GetAttributes(path);
+                                    //if ((att & FileAttributes.Directory) != FileAttributes.Directory) return;
+                                }
+                                catch (Exception e)
+                                {
+                                    logger.Debug("ERROR: {0}", e.Message);
+                                    return;
+                                }
+                                FileSecurity fileSecurity = File.GetAccessControl(path);
+                                IdentityReference sid = fileSecurity.GetOwner(typeof(SecurityIdentifier));
+                                if (sid.Equals(WindowsIdentity.GetCurrent().User))
+                                {
+                                    path = Path.GetFullPath(path);
+                                    callerIden = new SecurityIdentifier(WindowsIdentity.GetCurrent().User.Value);
+                                    _isValidPath = true;
+                                }
+                            });
+                            
+                            if (!_isValidPath
+                                    || !_executeCommand(command, path, callerIden))
+                            {
+                                retVal = "NG";
+                            }
+                        }
+                        else
+                        {
+                            retVal = "NG";
+                        }
+
+                        var input = Encoding.Unicode.GetBytes(retVal);
                         _inoutGate.Write(input, 0, input.Length);
                         _inoutGate.WaitForPipeDrain();
                         _inoutGate.Disconnect();
@@ -96,6 +299,76 @@ namespace ServiceSample
             _thread.IsBackground = true;
             _thread.Start();
             
+        }
+
+        private void EventLog_EventRecordWritten(object sender, EventRecordWrittenEventArgs e)
+        {
+            var xmlDoc = new XmlDocument();
+            xmlDoc.LoadXml(e.EventRecord.ToXml());
+            var eventData = xmlDoc.FirstChild.ChildNodes[1];
+            var type = eventData.GetType();
+            string filePath = "";
+            foreach (XmlElement node in eventData)
+            {
+                if (node.Attributes.GetNamedItem("Name").InnerText == "ObjectName")
+                {
+                    filePath = node.InnerText; break;
+                }
+            }
+
+            string path = "";
+            SecurityIdentifier secur = null;
+            object loc = null;
+            lock (_observingTargetLock)
+            {
+                if(_observingTarget != null)
+                {
+                    path = _observingTarget._path;
+                    secur = new SecurityIdentifier(_observingTarget._user.Value);
+                    loc = _observingTarget._lock;
+                }
+            }
+
+            if(!path.EndsWith("\\"))
+            {
+                path += "\\";
+            }
+
+            if(string.IsNullOrEmpty(path) 
+                || string.IsNullOrEmpty(filePath)
+                || !filePath.StartsWith(path))
+            {
+                return;
+            }
+
+            if (loc == null) return;
+
+            lock (loc)
+            {
+                if(!Directory.Exists(_rootApp)) 
+                {
+                    Directory.CreateDirectory(_rootApp);
+                }
+                if (!Directory.Exists(_logDestination))
+                {
+                    Directory.CreateDirectory(_logDestination);
+                }
+                if (!File.Exists(_logFileName))
+                {
+                    var strm = File.Create(_logFileName);
+                    strm.Close();
+                    var fileSecurity = File.GetAccessControl(_logFileName);
+                    fileSecurity.AddAccessRule(new FileSystemAccessRule(secur, FileSystemRights.FullControl, AccessControlType.Allow));
+                    File.SetAccessControl(_logFileName, fileSecurity);
+                }
+                using (var fileStrm = new FileStream(_logFileName, FileMode.Append, FileAccess.Write, FileShare.Write))
+                {
+                    filePath += "\r\n";
+                    byte[] buffer = Encoding.Unicode.GetBytes(filePath);
+                    fileStrm.Write(buffer, 0, buffer.Length);
+                    fileStrm.Flush();
+                }
+            }
         }
         public void _Initialize()
         {
@@ -137,17 +410,6 @@ namespace ServiceSample
             _InitializeSvr();
         }
 
-        protected override void OnStart(string[] args)
-        {
-            base.OnStart(args);
-            _Initialize();
-        }
-
-        private void EventLog_EventRecordWritten(object sender, EventRecordWrittenEventArgs e)
-        {
-            int tung = 1;
-        }
-
         private void _DeInitialize()
         {
             var logger = LogManager.GetCurrentClassLogger();
@@ -155,8 +417,16 @@ namespace ServiceSample
             _lock.Cancel();
 
             _thread.Join();
-            
+
             _eventLog.Enabled = false;
+        }
+
+
+
+        protected override void OnStart(string[] args)
+        {
+            base.OnStart(args);
+            _Initialize();
         }
 
         protected override void OnStop()

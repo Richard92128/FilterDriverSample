@@ -10,64 +10,25 @@
 
 int main()
 {
-    for (int i = 0; i < 100; ++i)
-    {
-		//HANDLE hPipe = NULL;
-		//while (TRUE)
-		//{
-		//	hPipe = CreateFile(
-		//		TEXT("\\\\.\\pipe\\WorkMornitorDeletedFileGate"),// Pipe name 
-		//		GENERIC_READ |			// Read and write access 
-		//		GENERIC_WRITE,
-		//		0,						// No sharing 
-		//		NULL,					// Default security attributes
-		//		OPEN_EXISTING,			// Opens existing pipe 
-		//		0,						// Default attributes 
-		//		NULL);					// No template file 
-
-		//	// Break if the pipe handle is valid. 
-		//	if (hPipe != INVALID_HANDLE_VALUE)
-		//		break;
-
-		//	if (// Exit if an error other than ERROR_PIPE_BUSY occurs
-		//		GetLastError() != ERROR_PIPE_BUSY
-		//		||
-		//		// All pipe instances are busy, so wait for 5 seconds
-		//		!WaitNamedPipe(TEXT("\\\\.\\pipe\\WorkMornitorDeletedFileGate"), 5000))
-		//	{
-		//		return 1;
-		//	}
-		//}
-
-		//// Set data to be read from the pipe as a stream of messages
-		//DWORD dwMode = PIPE_READMODE_MESSAGE;
-		//BOOL bResult = SetNamedPipeHandleState(hPipe, &dwMode, NULL, NULL);
-		//if (!bResult)
-		//{
-		//	continue;
-		//}
-
-  //      std::wstring message = L"TEST";
+  //  for (int i = 0; i < 100; ++i)
+  //  {
+		//std::wstring message = L"TEST";
   //      message += std::to_wstring(i);
   //      std::wstring retVal(1024, 0);
   //      DWORD byteRead = 0;
-		//TransactNamedPipe(hPipe, (LPVOID)message.data(),
-  //          message.length() * sizeof(wchar_t), (LPVOID)retVal.data(), retVal.length() * sizeof(wchar_t), &byteRead, NULL);
+		//if (!CallNamedPipe(TEXT("\\\\.\\pipe\\WorkMornitorDeletedFileGate"), (LPVOID)message.data(),
+		//	message.length() * sizeof(wchar_t), (LPVOID)retVal.data(), retVal.length() * sizeof(wchar_t), &byteRead, NULL))
+		//{
+		//	// retry
+		//	--i;
+		//}
+  //  }
 
-		//CloseHandle(hPipe);
-
-		std::wstring message = L"TEST";
-        message += std::to_wstring(i);
-        std::wstring retVal(1024, 0);
-        DWORD byteRead = 0;
-		if (!CallNamedPipe(TEXT("\\\\.\\pipe\\WorkMornitorDeletedFileGate"), (LPVOID)message.data(),
-			message.length() * sizeof(wchar_t), (LPVOID)retVal.data(), retVal.length() * sizeof(wchar_t), &byteRead, NULL))
-		{
-			// retry
-			--i;
-		}
-
-    }
+	std::wstring message = L"RegisterFolderPath>D:\\TestFolder";
+	std::wstring retVal(1024, 0);
+	DWORD byteRead = 0;
+	while (!CallNamedPipe(TEXT("\\\\.\\pipe\\WorkMornitorDeletedFileGate"), (LPVOID)message.data(),
+		message.length() * sizeof(wchar_t), (LPVOID)retVal.data(), retVal.length() * sizeof(wchar_t), &byteRead, NULL));
 	
     return 0;
 }
