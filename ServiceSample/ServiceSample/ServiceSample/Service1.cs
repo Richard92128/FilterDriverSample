@@ -28,27 +28,29 @@ namespace ServiceSample
         private static EventLogQuery _query = new EventLogQuery("Security", PathType.LogName, "*[EventData[Data[@Name='AccessMask']='0x10000']]");
         private EventLogWatcher _eventLog = new EventLogWatcher(_query);
 
+        //private NamedPipeServerStream _inoutGate = null;
+
         private void _InitializeSvr()
         {
             var logger = LogManager.GetCurrentClassLogger();
 
-            var IdentSystem = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
-            var IdentEveryOne = new SecurityIdentifier(WellKnownSidType.WorldSid, null);
-            var pipeSecurity = new PipeSecurity();
-            pipeSecurity.AddAccessRule(new PipeAccessRule(IdentSystem,
-                PipeAccessRights.ReadWrite | PipeAccessRights.CreateNewInstance,
-                AccessControlType.Allow));
-            pipeSecurity.AddAccessRule(new PipeAccessRule(IdentEveryOne,
-                PipeAccessRights.ReadWrite,
-                AccessControlType.Allow));
-
-            var _inoutGate = new NamedPipeServerStream("WorkMornitorDeletedFileGate", PipeDirection.InOut, 1,
-                            PipeTransmissionMode.Message, PipeOptions.Asynchronous, Setting._inoutMaxBufferLen, Setting._inoutMaxBufferLen, pipeSecurity);
             _thread = new Thread(() =>
             {
+                var IdentSystem = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
+                var IdentEveryOne = new SecurityIdentifier(WellKnownSidType.WorldSid, null);
+                var pipeSecurity = new PipeSecurity();
+                pipeSecurity.AddAccessRule(new PipeAccessRule(IdentSystem,
+                    PipeAccessRights.ReadWrite | PipeAccessRights.CreateNewInstance,
+                    AccessControlType.Allow));
+                pipeSecurity.AddAccessRule(new PipeAccessRule(IdentEveryOne,
+                    PipeAccessRights.ReadWrite,
+                    AccessControlType.Allow));
+
+                var _inoutGate = new NamedPipeServerStream("WorkMornitorDeletedFileGate", PipeDirection.InOut, 1,
+                                PipeTransmissionMode.Message, PipeOptions.Asynchronous, Setting._inoutMaxBufferLen, Setting._inoutMaxBufferLen, pipeSecurity);
+
                 while (!_lock.Token.IsCancellationRequested)
                 {
-                    //if (_inoutGate.IsMessageComplete) continue;
                     string path;
                     try
                     {
@@ -72,6 +74,7 @@ namespace ServiceSample
                         bool _isValidPath = false;
                         _inoutGate.RunAsClient(() =>
                         {
+                            // check permisson here
                             _isValidPath = true;
                         });
 
@@ -87,6 +90,8 @@ namespace ServiceSample
                         logger.Debug("ERROR: {0}", e.Message);
                     }
                 }
+
+                _inoutGate.Close();
             });
             _thread.IsBackground = true;
             _thread.Start();
@@ -148,6 +153,8 @@ namespace ServiceSample
             var logger = LogManager.GetCurrentClassLogger();
 
             _lock.Cancel();
+
+            _thread.Join();
             
             _eventLog.Enabled = false;
         }
