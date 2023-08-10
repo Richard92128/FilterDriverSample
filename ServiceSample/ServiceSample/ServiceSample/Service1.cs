@@ -53,7 +53,7 @@ namespace ServiceSample
 
                 if (isFolder)
                 {
-                    var fileSecurity = Directory.GetAccessControl(path);
+                    var fileSecurity = Directory.GetAccessControl(path, AccessControlSections.Audit);
 
                     if (isAdd)
                     {
@@ -70,7 +70,7 @@ namespace ServiceSample
                 }
                 else
                 {
-                    var fileSecurity = File.GetAccessControl(path);
+                    var fileSecurity = File.GetAccessControl(path, AccessControlSections.Audit);
 
                     if (isAdd)
                     {
